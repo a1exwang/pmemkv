@@ -34,6 +34,11 @@
 
 #include <vector>
 #include "../pmemkv.h"
+#include <memory>
+#include <libpmemobj++/p.hpp>
+#include <libpmemobj++/make_persistent_array.hpp>
+#include <libpmemobj++/make_persistent.hpp>
+#include <libpmemobj++/transaction.hpp>
 
 using std::move;
 using std::unique_ptr;

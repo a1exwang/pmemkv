@@ -37,6 +37,7 @@
 #include <list>
 #include <unistd.h>
 #include "kvtree2.h"
+#include "libpmemobj++/make_persistent_array.hpp"
 
 #define DO_LOG 0
 #define LOG(msg) if (DO_LOG) std::cout << "[kvtree2] " << msg << "\n"

@@ -32,9 +32,9 @@
 
 #include "gtest/gtest.h"
 #include "../mock_tx_alloc.h"
-#include "../../src/engines/kvtree2.h"
+#include "../../src/engines/kvtree3.h"
 
-using namespace pmemkv::kvtree2;
+using namespace pmemkv::kvtree3;
 
 const string PATH = "/dev/shm/pmemkv";
 const string PATH_CACHED = "/tmp/pmemkv";

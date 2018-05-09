@@ -41,11 +41,11 @@ typedef enum {                                             // status enumeration
 #ifdef __cplusplus
 
 #include <string>
-#include <libpmemobj++/make_persistent.hpp>
-#include <libpmemobj++/make_persistent_array.hpp>
-#include <libpmemobj++/persistent_ptr.hpp>
-#include <libpmemobj++/pool.hpp>
-#include <libpmemobj++/transaction.hpp>
+//#include <libpmemobj++/make_persistent.hpp>
+//#include <libpmemobj++/make_persistent_array.hpp>
+//#include <libpmemobj++/persistent_ptr.hpp>
+//#include <libpmemobj++/pool.hpp>
+//#include <libpmemobj++/transaction.hpp>
 
 using std::string;
 using std::to_string;
