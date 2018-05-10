@@ -543,7 +543,8 @@ namespace pmemkv {
         set_ph_direct(p, 0);
         set_ks_direct(p, 0);
         set_vs_direct(p, 0);
-        delete_persistent<char[]>(kv, sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t) + get_ks_direct(p) +
+        // TODO: originall delete_persistent<char[]>
+        delete_persistent_arr<char>(kv, sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t) + get_ks_direct(p) +
                                       get_vs_direct(p) + 2);
         kv = nullptr;
       }
@@ -552,7 +553,8 @@ namespace pmemkv {
     void KVSlot::set(const uint8_t hash, const string& key, const string& value) {
       if (kv) {
         char* p = kv.get();
-        delete_persistent<char[]>(kv, sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t) + get_ks_direct(p) +
+        // TODO: originall delete_persistent<char[]>
+        delete_persistent_arr<char>(kv, sizeof(uint8_t) + sizeof(uint32_t) + sizeof(uint32_t) + get_ks_direct(p) +
                                       get_vs_direct(p) + 2);
       }
       size_t ksize;
@@ -560,7 +562,8 @@ namespace pmemkv {
       ksize = key.size();
       vsize = value.size();
       size_t size = ksize + vsize + 2 + sizeof(uint32_t) + sizeof(uint32_t) + sizeof(uint8_t);
-      kv = make_persistent<char[]>(size);
+
+      kv = make_persistent<char>(size);
       char* p = kv.get();
       set_ph_direct(p, hash);
       set_ks_direct(p, (uint32_t) ksize);

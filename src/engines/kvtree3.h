@@ -37,16 +37,13 @@
 #include <libpmemobj++/p.hpp>
 #include "libpmemobj++/make_persistent_array.hpp"
 #include <libpmemobj++/make_persistent.hpp>
+#include <libpmemobj++/pool.hpp>
 #include "../pmemkv.h"
 
 using std::string;
 using std::move;
 using std::unique_ptr;
 using std::vector;
-using pmem::obj::p;
-using pmem::obj::persistent_ptr;
-using pmem::obj::make_persistent;
-using pmem::obj::delete_persistent;
 using pmem::obj::pool;
 
 namespace pmemkv {
@@ -56,11 +53,74 @@ namespace pmemkv {
     class p {
     public:
       p() = default;
-      T &get_rw() { return this->obj; }
+      T &get_rw() {
+        if (pmemobj_tx_stage() == TX_STAGE_WORK) {
+          if (pmemobj_pool_by_ptr(&obj)) {
+            pmemobj_tx_add_range_direct(&obj, sizeof(T));
+          }
+        }
+
+        return this->obj;
+      }
       const T &get_ro() const { return this->obj; }
     private:
       T obj;
     };
+
+    template <typename T>
+    class persistent_ptr {
+    public:
+      persistent_ptr() :oid(OID_NULL) { }
+      persistent_ptr(T *ptr) :oid(pmemobj_oid(ptr)) { }
+      persistent_ptr(PMEMoid oid) :oid(oid) { }
+      persistent_ptr(const persistent_ptr<T> &rhs) :oid(rhs.oid) { }
+      persistent_ptr<T> &operator=(const persistent_ptr<T> &rhs) {
+        this->oid = rhs.oid;
+        return *this;
+      }
+      T& operator*() {
+        return *ptr();
+      }
+      T* operator->() {
+        return ptr();
+      }
+      T* get() {
+        return ptr();
+      }
+      const T* get() const {
+        return ptr();
+      }
+      operator bool() const {
+        return ptr() != nullptr;
+      }
+      bool operator!=(const persistent_ptr<T> &rhs) {
+        return this->oid.pool_uuid_lo == rhs.oid.pool_uuid_lo && this->oid.off == rhs.oid.off;
+      }
+    private:
+      T *ptr() const {
+        return (T*)pmemobj_direct_inline(oid);
+      }
+      PMEMoid oid;
+    };
+
+    template <typename T>
+    persistent_ptr<T> make_persistent() {
+      auto p = pmem::obj::make_persistent<T>();
+      return persistent_ptr<T>(p.raw());
+    }
+    template <typename T>
+    persistent_ptr<T> make_persistent(size_t N) {
+      auto p = pmem::obj::make_persistent<T[]>(N);
+      return persistent_ptr<T>(p.raw());
+    }
+//    template <typename T>
+//    void delete_persistent(persistent_ptr<T> ptr) {
+//      pmem::obj::delete_persistent<T>(ptr);
+//    }
+    template <typename T>
+    void delete_persistent_arr(persistent_ptr<T> ptr, size_t len) {
+      pmem::obj::delete_persistent<T[]>(pmem::obj::persistent_ptr<T[]>(ptr.get()), len);
+    }
 
     const string ENGINE = "kvtree3";                           // engine identifier
 
@@ -98,7 +158,8 @@ namespace pmemkv {
       uint32_t get_vs_direct(char *p) const {return *((uint32_t *)((char *)(p) + sizeof(uint32_t)));}
       bool empty();
     private:
-      persistent_ptr<char[]> kv;                             // buffer for key & value
+      // TODO: originally char[]
+      persistent_ptr<char> kv;                             // buffer for key & value
     };
 
     struct KVLeaf {
