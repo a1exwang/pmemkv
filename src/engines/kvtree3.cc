@@ -42,35 +42,38 @@
 #define DO_LOG 0
 #define LOG(msg) if (DO_LOG) std::cout << "[kvtree3] " << msg << "\n"
 
-void *_tx = nullptr;
-
 namespace pmemkv {
   namespace kvtree3 {
 
     KVTree::KVTree(const string& path, const size_t size) : pmpath(path) {
-      if (path.find("/dev/dax") == 0) {
-        LOG("Opening device dax pool, path=" << path);
-        pmpool = pool<KVRoot>::open(path.c_str(), LAYOUT);
-        pmsize = 0;
-      } else if (access(path.c_str(), F_OK) != 0) {
-        LOG("Creating filesystem pool, path=" << path << ", size=" << to_string(size));
-        pmpool = pool<KVRoot>::create(path.c_str(), LAYOUT, size, S_IRWXU);
-        pmsize = size;
-      } else {
-        LOG("Opening filesystem pool, path=" << path);
-        pmpool = pool<KVRoot>::open(path.c_str(), LAYOUT);
-        struct stat st;
-        stat(path.c_str(), &st);
-        pmsize = (size_t) st.st_size;
+//      if (path.find("/dev/dax") == 0) {
+//        LOG("Opening device dax pool, path=" << path);
+//        pmpool = pool<KVRoot>::open(path.c_str(), LAYOUT);
+//        pmsize = 0;
+//      } else if (access(path.c_str(), F_OK) != 0) {
+//        LOG("Creating filesystem pool, path=" << path << ", size=" << to_string(size));
+//        pmpool = pool<KVRoot>::create(path.c_str(), LAYOUT, size, S_IRWXU);
+//        pmsize = size;
+//      } else {
+//        LOG("Opening filesystem pool, path=" << path);
+//        pmpool = pool<KVRoot>::open(path.c_str(), LAYOUT);
+//        struct stat st;
+//        stat(path.c_str(), &st);
+//        pmsize = (size_t) st.st_size;
+//      }
+      if (!nvm_init(path.c_str(), size)) {
+        throw std::runtime_error("failed to init nvm");
       }
+      pmsize = size;
       Recover();
       LOG("Opened ok");
     }
 
     KVTree::~KVTree() {
-      LOG("Closing");
-      pmpool.close();
-      LOG("Closed ok");
+      nvm_deinit();
+//      LOG("Closing");
+//      pmpool.close();
+//      LOG("Closed ok");
     }
 
 // ===============================================================================================
@@ -86,7 +89,8 @@ namespace pmemkv {
       analysis.size = pmsize;
 
       // iterate persistent leaves for stats
-      auto leaf = pmpool.get_root()->head;
+      auto leaf = ((KVRoot*)nvm_get_root())->head;
+//      auto leaf = pmpool.get_root()->head;
       while (leaf) {
         bool empty = true;
         for (int slot = LEAF_KEYS; slot--;) {
@@ -161,15 +165,15 @@ namespace pmemkv {
           unique_ptr<KVLeafNode> new_node(new KVLeafNode());
           new_node->is_leaf = true;
 //          transaction::exec_tx(pmpool, [&] {
-          void *ppmpool = &pmpool;
-          void *_tx;
+          void *ppmpool = nvm_get_root();
+          void *_tx = nvm_get_tx();
           #pragma clang nvm tx(ppmpool, _tx) nvmptrs()
           {
             if (!leaves_prealloc.empty()) {
               new_node->leaf = leaves_prealloc.back();
               leaves_prealloc.pop_back();
             } else {
-              auto root = pmpool.get_root();
+              auto root = (KVRoot*)nvm_get_root();
               auto old_head = root->head;
               auto new_leaf = make_persistent<KVLeaf>();
               root->head = new_leaf;
@@ -210,8 +214,9 @@ namespace pmemkv {
             auto leaf = leafnode->leaf;
 //            transaction::exec_tx(pmpool, [&] {
 
-            void *ppmpool = &pmpool;
-            #pragma clang nvm tx(ppmpool, _tx) nvmptrs()
+            void *ppmpool = nvm_get_root();
+            void *tx = nvm_get_tx();
+            #pragma clang nvm tx(ppmpool, tx) nvmptrs()
             {
               leaf->slots[slot].get_rw().clear();
             }
@@ -282,8 +287,9 @@ namespace pmemkv {
       if (slot >= 0) {
         LOG("   filling slot=" << slot);
 //        transaction::exec_tx(pmpool, [&] {
-        void *ppmpool = &pmpool;
-        #pragma clang nvm tx(ppmpool, _tx) nvmptrs()
+        void *ppmpool = (KVRoot*)nvm_get_root();
+        void *tx = nvm_get_tx();
+        #pragma clang nvm tx(ppmpool, tx) nvmptrs()
         {
           LeafFillSpecificSlot(leafnode, hash, key, value, slot);
         }
@@ -318,8 +324,9 @@ namespace pmemkv {
       new_leafnode->is_leaf = true;
 
 //      transaction::exec_tx(pmpool, [&] {
-      void *ppmpool = &pmpool;
-      #pragma clang nvm tx(ppmpool, _tx) nvmptrs()
+      void *ppmpool = nvm_get_pool();
+      void *tx = nvm_get_tx();
+      #pragma clang nvm tx(ppmpool, tx) nvmptrs()
       {
         persistent_ptr<KVLeaf> new_leaf;
         if (!leaves_prealloc.empty()) {
@@ -327,7 +334,7 @@ namespace pmemkv {
           new_leafnode->leaf = new_leaf;
           leaves_prealloc.pop_back();
         } else {
-          auto root = pmpool.get_root();
+          auto root = (KVRoot*)nvm_get_root();
           auto old_head = root->head;
           new_leaf = make_persistent<KVLeaf>();
           root->head = new_leaf;
@@ -428,7 +435,7 @@ namespace pmemkv {
 
       // traverse persistent leaves to build list of leaves to recover
       std::list<KVRecoveredLeaf> leaves;
-      auto leaf = pmpool.get_root()->head;
+      auto leaf = ((KVRoot*)nvm_get_root())->head;
       while (leaf) {
         unique_ptr<KVLeafNode> leafnode(new KVLeafNode());
         leafnode->leaf = leaf;
@@ -565,6 +572,12 @@ namespace pmemkv {
 
       kv = make_persistent<char>(size);
       char* p = kv.get();
+
+      // While pmdk automatically add all data in the allocated object to tx,
+      // we don't do that.
+      // The use has to manually do that.
+      nvm_add(nvm_get_pool(), nvm_get_tx(), p, size * sizeof(char));
+
       set_ph_direct(p, hash);
       set_ks_direct(p, (uint32_t) ksize);
       set_vs_direct(p, (uint32_t) vsize);
@@ -572,6 +585,18 @@ namespace pmemkv {
       memcpy(kvptr, key.data(), ksize);                                       // copy key into buffer
       kvptr += ksize + 1;                                                     // advance ptr past key
       memcpy(kvptr, value.data(), vsize);                                     // copy value into buffer
+    }
+
+    void KVSlot::set_ph_direct(char *p, uint8_t v) {
+      *((uint8_t *)(p + sizeof(uint32_t) + sizeof(uint32_t))) = v;
+    }
+
+    void KVSlot::set_ks_direct(char *p, uint32_t v) {
+      *((uint32_t *)(p)) = v;
+    }
+
+    void KVSlot::set_vs_direct(char *p, uint32_t v) {
+      *((uint32_t *)((char *)(p) + sizeof(uint32_t))) = v;
     }
 
 // ===============================================================================================

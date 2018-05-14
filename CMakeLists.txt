@@ -68,7 +68,7 @@ add_executable(pmemkv_test tests/pmemkv_test.cc tests/mock_tx_alloc.cc
                tests/engines/kvtree_test.cc
                tests/engines/versioned_b_tree_test.cc
 )
-target_link_libraries(pmemkv_test pmemkv gtest pragma_nvm_pmdk ${CMAKE_DL_LIBS})
+target_link_libraries(pmemkv_test pmemkv gtest pragma_nvm ${CMAKE_DL_LIBS})
 
 include_directories(leveldb leveldb/include leveldb/port leveldb/util)
 add_executable(pmemkv_bench
@@ -89,4 +89,4 @@ add_executable(pmemkv_bench
     leveldb/util/random.h
     leveldb/util/status.cc
 )
-target_link_libraries(pmemkv_bench pmemkv pthread pragma_nvm_pmdk)
+target_link_libraries(pmemkv_bench pmemkv pthread pragma_nvm)

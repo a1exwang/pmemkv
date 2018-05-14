@@ -116,14 +116,14 @@ TEST_F(KVEmptyTest, FailsToCreateInstanceWithHugeSize) {
     }
 }
 
-TEST_F(KVEmptyTest, FailsToCreateInstanceWithTinySize) {
-    try {
-        new KVTree(PATH, PMEMOBJ_MIN_POOL - 1);  // too small
-        FAIL();
-    } catch (...) {
-        // do nothing, expected to happen
-    }
-}
+//TEST_F(KVEmptyTest, FailsToCreateInstanceWithTinySize) {
+//    try {
+//        new KVTree(PATH, PMEMOBJ_MIN_POOL - 1);  // too small
+//        FAIL();
+//    } catch (...) {
+//        // do nothing, expected to happen
+//    }
+//}
 
 // =============================================================================================
 // TEST SINGLE-LEAF TREE
@@ -879,87 +879,87 @@ private:
 };
 
 const string LONGSTR = "123456789A123456789A123456789A123456789A123456789A123456789A123456789A";
-
-TEST_F(KVFullTest, OutOfSpace1Test) {
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put("100", "?") == FAILED);
-    tx_alloc_should_fail = false;
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace2aTest) {
-    ASSERT_TRUE(kv->Remove("100") == OK);
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
-    tx_alloc_should_fail = false;
-    ASSERT_TRUE(kv->Put("100", "100!") == OK) << pmemobj_errormsg();
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace2bTest) {
-    ASSERT_TRUE(kv->Remove("100") == OK);
-    ASSERT_TRUE(kv->Put("100", "100!") == OK) << pmemobj_errormsg();
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
-    tx_alloc_should_fail = false;
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace3aTest) {
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
-    tx_alloc_should_fail = false;
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace3bTest) {
-    tx_alloc_should_fail = true;
-    for (int i = 0; i <= 99999; i++) {
-        ASSERT_TRUE(kv->Put("123456", LONGSTR) == FAILED);
-    }
-    tx_alloc_should_fail = false;
-    ASSERT_TRUE(kv->Remove("4567") == OK);
-    ASSERT_TRUE(kv->Put("4567", "4567!") == OK) << pmemobj_errormsg();
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace4aTest) {
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put(to_string(LARGE_LIMIT + 1), "1") == FAILED);
-    tx_alloc_should_fail = false;
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace4bTest) {
-    tx_alloc_should_fail = true;
-    for (int i = 0; i <= 99999; i++) {
-        ASSERT_TRUE(kv->Put(to_string(LARGE_LIMIT + 1), "1") == FAILED);
-    }
-    tx_alloc_should_fail = false;
-    ASSERT_TRUE(kv->Remove("98765") == OK);
-    ASSERT_TRUE(kv->Put("98765", "98765!") == OK) << pmemobj_errormsg();
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace5aTest) {
-    tx_alloc_should_fail = true;
-    ASSERT_TRUE(kv->Put(LONGSTR, "1") == FAILED);
-    ASSERT_TRUE(kv->Put(LONGSTR, LONGSTR) == FAILED);
-    tx_alloc_should_fail = false;
-    Validate();
-}
-
-TEST_F(KVFullTest, OutOfSpace5bTest) {
-    tx_alloc_should_fail = true;
-    for (int i = 0; i <= 99999; i++) {
-        ASSERT_TRUE(kv->Put(LONGSTR, "1") == FAILED);
-        ASSERT_TRUE(kv->Put(LONGSTR, LONGSTR) == FAILED);
-    }
-    tx_alloc_should_fail = false;
-    ASSERT_TRUE(kv->Remove("34567") == OK);
-    ASSERT_TRUE(kv->Put("34567", "34567!") == OK) << pmemobj_errormsg();
-    Validate();
-}
+//
+//TEST_F(KVFullTest, OutOfSpace1Test) {
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put("100", "?") == FAILED);
+//    tx_alloc_should_fail = false;
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace2aTest) {
+//    ASSERT_TRUE(kv->Remove("100") == OK);
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
+//    tx_alloc_should_fail = false;
+//    ASSERT_TRUE(kv->Put("100", "100!") == OK) << pmemobj_errormsg();
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace2bTest) {
+//    ASSERT_TRUE(kv->Remove("100") == OK);
+//    ASSERT_TRUE(kv->Put("100", "100!") == OK) << pmemobj_errormsg();
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
+//    tx_alloc_should_fail = false;
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace3aTest) {
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put("100", LONGSTR) == FAILED);
+//    tx_alloc_should_fail = false;
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace3bTest) {
+//    tx_alloc_should_fail = true;
+//    for (int i = 0; i <= 99999; i++) {
+//        ASSERT_TRUE(kv->Put("123456", LONGSTR) == FAILED);
+//    }
+//    tx_alloc_should_fail = false;
+//    ASSERT_TRUE(kv->Remove("4567") == OK);
+//    ASSERT_TRUE(kv->Put("4567", "4567!") == OK) << pmemobj_errormsg();
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace4aTest) {
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put(to_string(LARGE_LIMIT + 1), "1") == FAILED);
+//    tx_alloc_should_fail = false;
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace4bTest) {
+//    tx_alloc_should_fail = true;
+//    for (int i = 0; i <= 99999; i++) {
+//        ASSERT_TRUE(kv->Put(to_string(LARGE_LIMIT + 1), "1") == FAILED);
+//    }
+//    tx_alloc_should_fail = false;
+//    ASSERT_TRUE(kv->Remove("98765") == OK);
+//    ASSERT_TRUE(kv->Put("98765", "98765!") == OK) << pmemobj_errormsg();
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace5aTest) {
+//    tx_alloc_should_fail = true;
+//    ASSERT_TRUE(kv->Put(LONGSTR, "1") == FAILED);
+//    ASSERT_TRUE(kv->Put(LONGSTR, LONGSTR) == FAILED);
+//    tx_alloc_should_fail = false;
+//    Validate();
+//}
+//
+//TEST_F(KVFullTest, OutOfSpace5bTest) {
+//    tx_alloc_should_fail = true;
+//    for (int i = 0; i <= 99999; i++) {
+//        ASSERT_TRUE(kv->Put(LONGSTR, "1") == FAILED);
+//        ASSERT_TRUE(kv->Put(LONGSTR, LONGSTR) == FAILED);
+//    }
+//    tx_alloc_should_fail = false;
+//    ASSERT_TRUE(kv->Remove("34567") == OK);
+//    ASSERT_TRUE(kv->Put("34567", "34567!") == OK) << pmemobj_errormsg();
+//    Validate();
+//}
 
 //TEST_F(KVFullTest, OutOfSpace6Test) {
 //    tx_alloc_should_fail = true;
@@ -969,8 +969,8 @@ TEST_F(KVFullTest, OutOfSpace5bTest) {
 //    ASSERT_TRUE(kv->Get(LONGSTR, &str) == NOT_FOUND) << pmemobj_errormsg();
 //    Validate();
 //}
-
-TEST_F(KVFullTest, RepeatedRecoveryTest) {
-    for (int i = 1; i <= 100; i++) Reopen();
-    Validate();
-}
+//
+//TEST_F(KVFullTest, RepeatedRecoveryTest) {
+//    for (int i = 1; i <= 100; i++) Reopen();
+//    Validate();
+//}

@@ -34,31 +34,33 @@
 
 #include <vector>
 #include <memory>
-#include <libpmemobj++/p.hpp>
-#include "libpmemobj++/make_persistent_array.hpp"
-#include <libpmemobj++/make_persistent.hpp>
-#include <libpmemobj++/pool.hpp>
 #include "../pmemkv.h"
+#include <libpmemobj++/pool.hpp>
+#include <libpmemobj++/p.hpp>
+#include <libpmemobj++/make_persistent_array.hpp>
+#include <libpmemobj++/make_persistent.hpp>
+#include <pragma_nvm.h>
+#include <PMBlockAlloc.h>
+using pmem::obj::pool;
 
 using std::string;
 using std::move;
 using std::unique_ptr;
 using std::vector;
-using pmem::obj::pool;
 
 namespace pmemkv {
   namespace kvtree3 {
-
     template <typename T>
     class p {
     public:
       p() = default;
       T &get_rw() {
-        if (pmemobj_tx_stage() == TX_STAGE_WORK) {
-          if (pmemobj_pool_by_ptr(&obj)) {
-            pmemobj_tx_add_range_direct(&obj, sizeof(T));
-          }
-        }
+        nvm_add(nvm_get_pool(), nvm_get_tx(), &obj, sizeof(T));
+//        if (pmemobj_tx_stage() == TX_STAGE_WORK) {
+//          if (pmemobj_pool_by_ptr(&obj)) {
+//            pmemobj_tx_add_range_direct(&obj, sizeof(T));
+//          }
+//        }
 
         return this->obj;
       }
@@ -70,48 +72,62 @@ namespace pmemkv {
     template <typename T>
     class persistent_ptr {
     public:
-      persistent_ptr() :oid(OID_NULL) { }
-      persistent_ptr(T *ptr) :oid(pmemobj_oid(ptr)) { }
-      persistent_ptr(PMEMoid oid) :oid(oid) { }
-      persistent_ptr(const persistent_ptr<T> &rhs) :oid(rhs.oid) { }
+      persistent_ptr() :ptr(nullptr) { }
+      persistent_ptr(T *ptr) :ptr(ptr) { }
+//      persistent_ptr(PMEMoid oid) :ptr(ptr) { }
+      persistent_ptr(const persistent_ptr<T> &rhs) :ptr(rhs.ptr) { }
       persistent_ptr<T> &operator=(const persistent_ptr<T> &rhs) {
-        this->oid = rhs.oid;
+        this->ptr = rhs.ptr;
         return *this;
       }
       T& operator*() {
-        return *ptr();
+        return *ptr;
       }
       T* operator->() {
-        return ptr();
+        return ptr;
       }
       T* get() {
-        return ptr();
+        return ptr;
       }
       const T* get() const {
-        return ptr();
+        return ptr;
       }
       operator bool() const {
-        return ptr() != nullptr;
+        return ptr != nullptr;
       }
       bool operator!=(const persistent_ptr<T> &rhs) {
-        return this->oid.pool_uuid_lo == rhs.oid.pool_uuid_lo && this->oid.off == rhs.oid.off;
+//        return this->oid.pool_uuid_lo == rhs.oid.pool_uuid_lo && this->oid.off == rhs.oid.off;
+        return this->ptr != rhs.ptr;
       }
     private:
-      T *ptr() const {
-        return (T*)pmemobj_direct_inline(oid);
-      }
-      PMEMoid oid;
+      T *ptr;
     };
 
+    static int a = 0;
     template <typename T>
     persistent_ptr<T> make_persistent() {
-      auto p = pmem::obj::make_persistent<T>();
-      return persistent_ptr<T>(p.raw());
+      if (sizeof(T) != 392) {
+        abort();
+      }
+//      a++;
+//      printf("a = %d\n", a);
+//      return persistent_ptr<T>((T*)malloc(sizeof(T)));
+      return persistent_ptr<T>(
+          ((pragma_nvm::TheAlloc*)nvm_get_alloc())->allocAs<T>((pragma_nvm::PMTx*)nvm_get_tx())
+      );
     }
     template <typename T>
-    persistent_ptr<T> make_persistent(size_t N) {
-      auto p = pmem::obj::make_persistent<T[]>(N);
-      return persistent_ptr<T>(p.raw());
+    persistent_ptr<T> make_persistent(size_t n) {
+      if (n * sizeof(T) > pragma_nvm::MaxDataSize) {
+        abort();
+      }
+
+//      a++;
+//      printf("a = %d\n", a);
+      return persistent_ptr<T>(
+          ((pragma_nvm::TheAlloc*)nvm_get_alloc())->allocAs<T>((pragma_nvm::PMTx*)nvm_get_tx())
+      );
+//      return persistent_ptr<T>((T*)malloc(sizeof(T)*n));
     }
 //    template <typename T>
 //    void delete_persistent(persistent_ptr<T> ptr) {
@@ -119,8 +135,14 @@ namespace pmemkv {
 //    }
     template <typename T>
     void delete_persistent_arr(persistent_ptr<T> ptr, size_t len) {
-      pmem::obj::delete_persistent<T[]>(pmem::obj::persistent_ptr<T[]>(ptr.get()), len);
+//      pmem::obj::delete_persistent<T[]>(pmem::obj::persistent_ptr<T[]>(ptr.get()), len);
+//      printf("delete_persistent_arr: ptr=%p, len=%ld\n", ptr.get(), len);
     }
+  }
+}
+
+namespace pmemkv {
+  namespace kvtree3 {
 
     const string ENGINE = "kvtree3";                           // engine identifier
 
@@ -144,12 +166,9 @@ namespace pmemkv {
       const uint32_t valsize_direct(char *p) const { return *((uint32_t *)(p + sizeof(uint32_t))); }
       void clear();
       void set(const uint8_t hash, const string& key, const string& value);
-      void set_ph(uint8_t v) {*((uint8_t *)((char *)(kv.get()) + sizeof(uint32_t) + sizeof(uint32_t))) = v;}
-      void set_ph_direct(char *p, uint8_t v) {*((uint8_t *)(p + sizeof(uint32_t) + sizeof(uint32_t))) = v;}
-      void set_ks(uint32_t v) {*((uint32_t *)(kv.get())) = v;}
-      void set_ks_direct(char * p, uint32_t v) {*((uint32_t *)(p)) = v;}
-      void set_vs(uint32_t v) {*((uint32_t *)((char *)(kv.get()) + sizeof(uint32_t))) = v;}
-      void set_vs_direct(char *p, uint32_t v) {*((uint32_t *)((char *)(p) + sizeof(uint32_t))) = v;}
+      void set_ph_direct(char *p, uint8_t v);
+      void set_ks_direct(char * p, uint32_t v);
+      void set_vs_direct(char *p, uint32_t v);
       uint8_t get_ph() const {return *((uint8_t *)((char *)(kv.get()) + sizeof(uint32_t) + sizeof(uint32_t)));}
       uint8_t get_ph_direct(char *p) const {return *((uint8_t *)((char *)(p) + sizeof(uint32_t) + sizeof(uint32_t)));}
       uint32_t get_ks() const {return *((uint32_t *)(kv.get()));}
@@ -253,7 +272,7 @@ namespace pmemkv {
       void operator=(const KVTree&);                         // prevent assigning
       vector<persistent_ptr<KVLeaf>> leaves_prealloc;        // persisted but unused leaves
       const string pmpath;                                   // path when constructed
-      pool<KVRoot> pmpool;                                   // pool for persistent root
+//      pool<KVRoot> pmpool;                                   // pool for persistent root
       size_t pmsize;                                         // actual size of persistent pool
       unique_ptr<KVNode> tree_top;                           // pointer to uppermost inner node
     };
