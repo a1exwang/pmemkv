@@ -61,10 +61,11 @@ namespace pmemkv {
 //        stat(path.c_str(), &st);
 //        pmsize = (size_t) st.st_size;
 //      }
-      if (!nvm_init(path.c_str(), size)) {
+      uint64_t s = size;
+      if (!nvm_init(path.c_str(), &s)) {
         throw std::runtime_error("failed to init nvm");
       }
-      pmsize = size;
+      pmsize = s;
       Recover();
       LOG("Opened ok");
     }
@@ -145,7 +146,7 @@ namespace pmemkv {
             if (leafnode->keys[slot].compare(key) == 0) {
               auto kv = leafnode->leaf->slots[slot].get_ro();
               LOG("   found value, slot=" << slot << ", size=" << to_string(kv.valsize()));
-              value->append(kv.val());
+              value->append(kv.val(), kv.get_vs());
               return OK;
             }
           }

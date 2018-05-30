@@ -88,15 +88,15 @@ TEST_F(KVEmptyTest, CreateInstanceTest) {
     delete kv;
 }
 
-TEST_F(KVEmptyTest, CreateInstanceFromExistingTest) {
-    KVTree *kv = new KVTree(PATH, PMEMOBJ_MIN_POOL * 2);
-    delete kv;
-    kv = new KVTree(PATH, PMEMOBJ_MIN_POOL);
-    KVTreeAnalysis analysis = {};
-    kv->Analyze(analysis);
-    ASSERT_EQ(analysis.size, PMEMOBJ_MIN_POOL * 2);
-    delete kv;
-}
+//TEST_F(KVEmptyTest, CreateInstanceFromExistingTest) {
+//    KVTree *kv = new KVTree(PATH, PMEMOBJ_MIN_POOL * 2);
+//    delete kv;
+//    kv = new KVTree(PATH, PMEMOBJ_MIN_POOL);
+//    KVTreeAnalysis analysis = {};
+//    kv->Analyze(analysis);
+//    ASSERT_EQ(analysis.size, PMEMOBJ_MIN_POOL * 2);
+//    delete kv;
+//}
 
 TEST_F(KVEmptyTest, FailsToCreateInstanceWithInvalidPath) {
     try {
@@ -143,9 +143,9 @@ TEST_F(KVTest, BinaryKeyTest) {
 }
 
 TEST_F(KVTest, BinaryValueTest) {
-    ASSERT_TRUE(kv->Put("key1", string("A\0B\0\0C", 3)) == OK) << pmemobj_errormsg();
+    ASSERT_TRUE(kv->Put("key1", string("A\0B\0\0C", 6)) == OK) << pmemobj_errormsg();
     string value;
-    ASSERT_TRUE(kv->Get("key1", &value) == OK && value == "A\0B\0\0C");
+    ASSERT_TRUE(kv->Get("key1", &value) == OK && value == string("A\0B\0\0C", 6));
     Analyze();
     ASSERT_EQ(analysis.leaf_empty, 0);
     ASSERT_EQ(analysis.leaf_prealloc, 0);
@@ -451,6 +451,9 @@ TEST_F(KVTest, PutAfterRecoveryTest) {
     ASSERT_TRUE(kv->Put("key1", "VALUE1") == OK) << pmemobj_errormsg();           // same size
     ASSERT_TRUE(kv->Get("key1", &new_value) == OK && new_value == "VALUE1");
     Reopen();
+
+    string new_value_m1;
+    ASSERT_TRUE(kv->Get("key1", &new_value_m1) == OK && new_value_m1 == "VALUE1");
 
     string new_value2;
     ASSERT_TRUE(kv->Put("key1", "new_value") == OK) << pmemobj_errormsg();        // longer size

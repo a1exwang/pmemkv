@@ -39,7 +39,7 @@
 namespace pmemkv {
 
 KVEngine* KVEngine::Open(const string& engine, const string& path, const size_t size) {
-    try {
+//    try {
         if (engine == blackhole::ENGINE) {
             return new blackhole::Blackhole();
         } else if (engine == kvtree::ENGINE) {
@@ -53,9 +53,9 @@ KVEngine* KVEngine::Open(const string& engine, const string& path, const size_t 
         } else {
             return nullptr;
         }
-    } catch (...) {
-        return nullptr;
-    }
+//    } catch (...) {
+//        return nullptr;
+//    }
 }
 
 void KVEngine::Close(KVEngine* kv) {

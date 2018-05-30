@@ -72,35 +72,36 @@ namespace pmemkv {
     template <typename T>
     class persistent_ptr {
     public:
-      persistent_ptr() :ptr(nullptr) { }
-      persistent_ptr(T *ptr) :ptr(ptr) { }
+      persistent_ptr() :offset(0) { }
+      persistent_ptr(T* ptr) :offset(((pragma_nvm::PMPool*)nvm_get_pool())->offset(ptr)) { }
+      persistent_ptr(uint64_t offset) :offset(offset) { }
 //      persistent_ptr(PMEMoid oid) :ptr(ptr) { }
-      persistent_ptr(const persistent_ptr<T> &rhs) :ptr(rhs.ptr) { }
+      persistent_ptr(const persistent_ptr<T> &rhs) :offset(rhs.offset) { }
       persistent_ptr<T> &operator=(const persistent_ptr<T> &rhs) {
-        this->ptr = rhs.ptr;
+        this->offset = rhs.offset;
         return *this;
       }
       T& operator*() {
-        return *ptr;
+        return *get();
       }
       T* operator->() {
-        return ptr;
+        return get();
       }
       T* get() {
-        return ptr;
+        return ((pragma_nvm::PMPool*)nvm_get_pool())->directAs<T>(offset);
       }
       const T* get() const {
-        return ptr;
+        return ((pragma_nvm::PMPool*)nvm_get_pool())->directAs<T>(offset);
       }
       operator bool() const {
-        return ptr != nullptr;
+        return offset != 0;
       }
       bool operator!=(const persistent_ptr<T> &rhs) {
 //        return this->oid.pool_uuid_lo == rhs.oid.pool_uuid_lo && this->oid.off == rhs.oid.off;
-        return this->ptr != rhs.ptr;
+        return this->offset != rhs.offset;
       }
     private:
-      T *ptr;
+      uint64_t offset;
     };
 
     static int a = 0;
@@ -137,6 +138,7 @@ namespace pmemkv {
     void delete_persistent_arr(persistent_ptr<T> ptr, size_t len) {
 //      pmem::obj::delete_persistent<T[]>(pmem::obj::persistent_ptr<T[]>(ptr.get()), len);
 //      printf("delete_persistent_arr: ptr=%p, len=%ld\n", ptr.get(), len);
+      ((pragma_nvm::TheAlloc*)nvm_get_alloc())->freeDirect((pragma_nvm::PMTx*)nvm_get_tx(), ptr.get());
     }
   }
 }
